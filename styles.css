@@ -177,16 +177,3 @@ p {
 #seek-slider, #volume-slider {
     --value: 0;
 }
-
-#seek-slider {
-    --value: calc((var(--val) / var(--max)) * 100);
-}
-
-#volume-slider {
-    --value: calc((var(--val) / 100) * 100);
-}
-
-input[type="range"] {
-    --val: attr(value);
-    --max: attr(max);
-}
