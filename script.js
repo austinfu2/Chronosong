@@ -49,18 +49,26 @@ function getTokenFromUrl() {
         return acc;
     }, {});
     console.log("Hash:", hash);
-    const storedState = localStorage.getItem("spotify_auth_state");
-    if (hash.state === storedState && hash.access_token) {
+    const storedState = localStorage.getItem("spotify_auth_state") || "no-state"; // Fallback
+    if (hash.state && hash.state !== storedState) {
+        console.error("State mismatch. Expected:", storedState, "Got:", hash.state);
+        return;
+    }
+    if (hash.access_token) {
         token = hash.access_token;
         console.log("Token set:", token);
         window.location.hash = "";
-        localStorage.removeItem("spotify_auth_state");
+        try {
+            localStorage.removeItem("spotify_auth_state");
+        } catch (e) {
+            console.warn("Couldn’t clear localStorage:", e);
+        }
         loginBtn.style.display = "none";
         spotifyPlayer.style.display = "block";
         gameContainer.style.display = "block";
         startRound();
     } else {
-        console.error("Auth failed. Hash state:", hash.state, "Stored state:", storedState);
+        console.error("No access token found");
     }
 }
 
@@ -103,11 +111,11 @@ async function startRound() {
         }
     } catch (error) {
         console.error("Error fetching song:", error);
-        nowPlaying.textContent = "Failed to load a song. Please try again.";
-        guessBtn.disabled = true; // Disable guessing until resolved
+        nowPlaying.textContent = "Failed to load a song. Retrying...";
+        guessBtn.disabled = true;
         setTimeout(() => {
             guessBtn.disabled = false;
-            startRound(); // Retry once after delay
+            startRound();
         }, 2000);
         return;
     }
@@ -122,31 +130,27 @@ async function startRound() {
 }
 
 async function getRandomSong() {
-    const possibleQueries = ['a', 'b', 'pop', 'rock', 'jazz', '2020', 'love']; // Predefined queries
-    let attempts = 0;
-    const maxAttempts = 5;
-
-    while (attempts < maxAttempts) {
-        const query = possibleQueries[Math.floor(Math.random() * possibleQueries.length)];
-        try {
-            const response = await fetch(`https://api.spotify.com/v1/search?q=${query}&type=track&limit=50`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            if (!response.ok) {
-                throw new Error(`Spotify API error: ${response.status}`);
-            }
-            const data = await response.json();
-            const tracks = data.tracks.items.filter(track => track.preview_url && track.popularity >= 30);
-            if (tracks.length > 0) {
-                return tracks[Math.floor(Math.random() * tracks.length)];
-            }
-            console.log(`No valid tracks for query "${query}", retrying...`);
-        } catch (error) {
-            console.error(`Attempt ${attempts + 1} failed:`, error);
+    try {
+        // Use a popular Spotify playlist (e.g., "Today's Top Hits")
+        const playlistId = "37i9dQZF1DXcBWIGoYBM5M"; // Today's Top Hits
+        const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!response.ok) {
+            throw new Error(`Spotify API error: ${response.status}`);
         }
-        attempts++;
+        const data = await response.json();
+        const tracks = data.items
+            .map(item => item.track)
+            .filter(track => track && track.preview_url && track.popularity >= 30);
+        if (tracks.length === 0) {
+            throw new Error("No tracks with previews found in playlist");
+        }
+        return tracks[Math.floor(Math.random() * tracks.length)];
+    } catch (error) {
+        console.error("Fetch error:", error);
+        throw error; // Let startRound handle it
     }
-    throw new Error("No valid song found after max attempts");
 }
 
 function playSong(url) {
