@@ -1,6 +1,7 @@
 // Spotify credentials
 const clientId = "41145da745e74ef8bb6e57a16a98997e";
 const redirectUri = "https://chronosong.vercel.app/";
+const scopes = "streaming user-read-email user-read-private user-modify-playback-state";
 
 // Game state
 let round = 1;
@@ -9,7 +10,9 @@ const totalRounds = 10;
 let currentSongYear;
 const rankings = [];
 let token;
-let audio;
+let player;
+let deviceId;
+let isPlaying = false;
 
 // DOM elements
 const loginBtn = document.getElementById("login-btn");
@@ -37,8 +40,7 @@ function generateRandomString(length) {
 
 function login() {
     const state = generateRandomString(16);
-    localStorage.setItem("spotify_auth_state", state);
-    const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user-read-private&state=${state}`;
+    const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&state=${state}`;
     window.location = authUrl;
 }
 
@@ -49,75 +51,156 @@ function getTokenFromUrl() {
         return acc;
     }, {});
     console.log("Hash:", hash);
-    const storedState = localStorage.getItem("spotify_auth_state");
-    if (hash.state === storedState && hash.access_token) {
+    if (hash.access_token) {
         token = hash.access_token;
         console.log("Token set:", token);
         window.location.hash = "";
-        localStorage.removeItem("spotify_auth_state");
+        setupPlayer();
+    } else {
+        console.error("Auth failed:", hash);
+    }
+}
+
+// Spotify player setup
+window.onSpotifyWebPlaybackSDKReady = () => {
+    console.log("Spotify SDK loaded");
+    if (token) setupPlayer(); // Ensure token is set before setup
+};
+
+function setupPlayer() {
+    player = new window.Spotify.Player({
+        name: "ChronoSong Player",
+        getOAuthToken: cb => cb(token),
+        volume: volumeSlider.value / 100
+    });
+
+    player.addListener("ready", ({ device_id }) => {
+        deviceId = device_id;
+        console.log("Player ready with Device ID:", device_id);
+        activateDevice(device_id);
+    });
+
+    player.addListener("not_ready", ({ device_id }) => console.log("Device offline:", device_id));
+    player.addListener("player_state_changed", state => {
+        if (state) {
+            isPlaying = !state.paused;
+            playPauseBtn.textContent = isPlaying ? "Pause" : "Play";
+            seekSlider.value = state.position / 1000;
+            seekSlider.max = state.duration / 1000; // Full track duration
+        }
+    });
+
+    player.connect().then(success => {
+        if (success) console.log("Player connected");
+        else console.error("Player connection failed");
+    }).catch(err => console.error("Connect error:", err));
+}
+
+function activateDevice(deviceId) {
+    fetch("https://api.spotify.com/v1/me/player", {
+        method: "PUT",
+        headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ device_ids: [device_id], play: false })
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(`Activate failed: ${response.status}`);
+        console.log("Device activated");
         loginBtn.style.display = "none";
         spotifyPlayer.style.display = "block";
         gameContainer.style.display = "block";
         startRound();
-    } else {
-        console.error("Auth failed. Hash state:", hash.state, "Stored state:", storedState);
-    }
+    })
+    .catch(err => console.error("Activate error:", err));
 }
 
 // Player controls
-audio = new Audio();
-audio.addEventListener("timeupdate", () => {
-    seekSlider.value = audio.currentTime;
-});
-audio.addEventListener("loadedmetadata", () => {
-    seekSlider.max = audio.duration;
-});
-
 playPauseBtn.addEventListener("click", () => {
-    if (audio.paused) {
-        audio.play();
-        playPauseBtn.textContent = "Pause";
+    if (isPlaying) {
+        player.pause();
     } else {
-        audio.pause();
-        playPauseBtn.textContent = "Play";
+        player.resume();
     }
 });
 
 seekSlider.addEventListener("input", () => {
-    audio.currentTime = seekSlider.value;
+    player.seek(seekSlider.value * 1000);
 });
 
 volumeSlider.addEventListener("input", () => {
-    audio.volume = volumeSlider.value / 100;
+    player.setVolume(volumeSlider.value / 100);
 });
 
 // Game logic
 async function startRound() {
-    const song = await getRandomSong();
-    currentSongYear = new Date(song.album.release_date).getFullYear();
-    roundSpan.textContent = round;
-    scoreSpan.textContent = score;
-    result.textContent = "";
-    nowPlaying.textContent = `${song.name} by ${song.artists[0].name}`;
-    seekSlider.value = 0;
-    playSong(song.preview_url);
+    try {
+        nowPlaying.textContent = "Loading song...";
+        const song = await getRandomSong();
+        if (!song || !song.album) throw new Error("Invalid song data");
+        currentSongYear = new Date(song.album.release_date).getFullYear();
+        roundSpan.textContent = round;
+        scoreSpan.textContent = score;
+        result.textContent = "";
+        nowPlaying.textContent = `${song.name} by ${song.artists[0].name}`;
+        seekSlider.value = 0;
+        playSong(song.uri);
+    } catch (error) {
+        console.error("Start round error:", error);
+        nowPlaying.textContent = "Failed to load song. Retrying...";
+        setTimeout(startRound, 2000);
+    }
 }
 
 async function getRandomSong() {
-    const query = generateRandomString(2);
-    const response = await fetch(`https://api.spotify.com/v1/search?q=${query}&type=track&limit=50`, {
-        headers: { "Authorization": `Bearer ${token}` }
-    });
-    const data = await response.json();
-    const tracks = data.tracks.items.filter(track => track.popularity >= 30 && track.preview_url);
-    return tracks[Math.floor(Math.random() * tracks.length)];
+    const queries = ["pop", "rock", "jazz", "hits", "2020s"]; // Broader queries
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    while (attempts < maxAttempts) {
+        const query = queries[Math.floor(Math.random() * queries.length)];
+        try {
+            const response = await fetch(`https://api.spotify.com/v1/search?q=${query}&type=track&limit=50`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error(`Search failed: ${response.status}`);
+            const data = await response.json();
+            const tracks = data.tracks.items.filter(track => track.popularity >= 30);
+            if (tracks.length === 0) {
+                console.log(`No tracks for query "${query}", retrying...`);
+                attempts++;
+                continue;
+            }
+            return tracks[Math.floor(Math.random() * tracks.length)];
+        } catch (error) {
+            console.error(`Search attempt ${attempts + 1} failed:`, error);
+            attempts++;
+        }
+    }
+    throw new Error("No valid tracks found after max attempts");
 }
 
-function playSong(url) {
-    audio.src = url;
-    audio.volume = volumeSlider.value / 100;
-    audio.play();
-    playPauseBtn.textContent = "Pause";
+function playSong(uri) {
+    fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+        method: "PUT",
+        headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ uris: [uri] })
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(`Play failed: ${response.status}`);
+        console.log(`Playing ${uri}`);
+        isPlaying = true;
+        playPauseBtn.textContent = "Pause";
+    })
+    .catch(err => {
+        console.error("Play error:", err);
+        nowPlaying.textContent = "Error playing song. Skipping...";
+        setTimeout(startRound, 1000);
+    });
 }
 
 slider.addEventListener("input", () => {
@@ -125,10 +208,10 @@ slider.addEventListener("input", () => {
 });
 
 guessBtn.addEventListener("click", () => {
-    audio.pause();
+    player.pause();
     const guess = parseInt(slider.value);
     const diff = Math.abs(guess - currentSongYear);
-    let roundScore = diff >= 10 ? 0 : Math.round(100 * Math.pow(0.5, diff / 2)); // Logarithmic drop-off
+    let roundScore = diff >= 10 ? 0 : Math.round(100 * Math.pow(0.5, diff / 2));
 
     score += roundScore;
     result.textContent = `Song year: ${currentSongYear}. You scored: ${roundScore}`;
@@ -143,7 +226,7 @@ guessBtn.addEventListener("click", () => {
 });
 
 function endGame() {
-    audio.pause();
+    player.pause();
     finalScoreValue.textContent = score;
     rankings.push(score);
     rankings.sort((a, b) => b - a);
