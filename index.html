@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChronoSong</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>ChronoSong</h1>
+        <p>Round: <span id="round">1</span>/10</p>
+        <button id="login-btn">Login with Spotify</button>
+        <div id="spotify-player" style="display: none;">
+            <p id="now-playing"></p>
+            <div class="controls">
+                <button id="play-pause-btn">Pause</button>
+                <input type="range" id="seek-slider" min="0" max="30" value="0">
+                <div class="volume-container">
+                    <label>Volume</label>
+                    <input type="range" id="volume-slider" min="0" max="100" value="50">
+                </div>
+            </div>
+        </div>
+        <div id="game-container" style="display: none;">
+            <input type="range" id="year-slider" min="1900" max="2025" value="1962">
+            <p><span id="selected-year">1962</span></p>
+            <button id="guess-btn">Guess</button>
+            <p>Score: <span id="score">0</span></p>
+            <p id="result"></p>
+        </div>
+        <div id="final-score" style="display: none;">
+            <h2>Your Final Score: <span id="final-score-value"></span></h2>
+            <h3>Rankings</h3>
+            <ul id="rankings"></ul>
+            <button id="play-again">Play Again</button>
+        </div>
+    </div>
+    <script src="https://sdk.scdn.co/spotify-player.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
