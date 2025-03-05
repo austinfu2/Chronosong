@@ -37,8 +37,7 @@ function generateRandomString(length) {
 
 function login() {
     const state = generateRandomString(16);
-    localStorage.setItem("spotify_auth_state", state);
-    const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user-read-private&state=${state}`;
+    const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user-read-private%20playlist-read-private&state=${state}`;
     window.location = authUrl;
 }
 
@@ -49,20 +48,10 @@ function getTokenFromUrl() {
         return acc;
     }, {});
     console.log("Hash:", hash);
-    const storedState = localStorage.getItem("spotify_auth_state") || "no-state"; // Fallback
-    if (hash.state && hash.state !== storedState) {
-        console.error("State mismatch. Expected:", storedState, "Got:", hash.state);
-        return;
-    }
     if (hash.access_token) {
         token = hash.access_token;
         console.log("Token set:", token);
         window.location.hash = "";
-        try {
-            localStorage.removeItem("spotify_auth_state");
-        } catch (e) {
-            console.warn("Couldn’t clear localStorage:", e);
-        }
         loginBtn.style.display = "none";
         spotifyPlayer.style.display = "block";
         gameContainer.style.display = "block";
@@ -78,7 +67,7 @@ audio.addEventListener("timeupdate", () => {
     seekSlider.value = audio.currentTime;
 });
 audio.addEventListener("loadedmetadata", () => {
-    seekSlider.max = audio.duration;
+    seekSlider.max = 30; // Previews are 30s
 });
 
 playPauseBtn.addEventListener("click", () => {
@@ -97,7 +86,7 @@ seekSlider.addEventListener("input", () => {
 
 volumeSlider.addEventListener("input", () => {
     audio.volume = volumeSlider.value / 100;
-    volumeSlider.style.setProperty('--value', volumeSlider.value); // Update fill
+    volumeSlider.style.setProperty('--value', volumeSlider.value);
 });
 
 // Game logic
@@ -131,26 +120,44 @@ async function startRound() {
 
 async function getRandomSong() {
     try {
-        // Use a popular Spotify playlist (e.g., "Today's Top Hits")
         const playlistId = "37i9dQZF1DXcBWIGoYBM5M"; // Today's Top Hits
         const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`, {
             headers: { "Authorization": `Bearer ${token}` }
         });
         if (!response.ok) {
-            throw new Error(`Spotify API error: ${response.status}`);
+            console.warn(`Playlist fetch failed: ${response.status}. Falling back to search...`);
+            return await fallbackToSearch();
         }
         const data = await response.json();
         const tracks = data.items
             .map(item => item.track)
             .filter(track => track && track.preview_url && track.popularity >= 30);
         if (tracks.length === 0) {
-            throw new Error("No tracks with previews found in playlist");
+            console.warn("No tracks with previews in playlist. Falling back to search...");
+            return await fallbackToSearch();
         }
         return tracks[Math.floor(Math.random() * tracks.length)];
     } catch (error) {
-        console.error("Fetch error:", error);
-        throw error; // Let startRound handle it
+        console.error("Playlist fetch error:", error);
+        return await fallbackToSearch();
     }
+}
+
+async function fallbackToSearch() {
+    const queries = ["pop", "rock", "jazz", "hits", "2020s"];
+    const query = queries[Math.floor(Math.random() * queries.length)];
+    const response = await fetch(`https://api.spotify.com/v1/search?q=${query}&type=track&limit=50`, {
+        headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!response.ok) {
+        throw new Error(`Search API error: ${response.status}`);
+    }
+    const data = await response.json();
+    const tracks = data.tracks.items.filter(track => track.preview_url && track.popularity >= 30);
+    if (tracks.length === 0) {
+        throw new Error("No valid tracks found in search");
+    }
+    return tracks[Math.floor(Math.random() * tracks.length)];
 }
 
 function playSong(url) {
@@ -162,7 +169,7 @@ function playSong(url) {
         setTimeout(startRound, 1000);
     });
     playPauseBtn.textContent = "Pause";
-    seekSlider.max = 30; // Hardcode to 30s for previews
+    seekSlider.max = 30;
 }
 
 slider.addEventListener("input", () => {
