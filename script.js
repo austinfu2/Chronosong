@@ -1,7 +1,6 @@
 // Spotify credentials
 const clientId = "41145da745e74ef8bb6e57a16a98997e";
 const redirectUri = "https://chronosong.vercel.app/";
-const scopes = "streaming user-read-email user-read-private user-modify-playback-state";
 
 // Spotify credentials
 const clientId = "YOUR_CLIENT_ID_HERE"; // Replace with your Client ID
