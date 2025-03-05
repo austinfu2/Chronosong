@@ -2,10 +2,6 @@
 const clientId = "41145da745e74ef8bb6e57a16a98997e";
 const redirectUri = "https://chronosong.vercel.app/";
 
-// Spotify credentials
-const clientId = "YOUR_CLIENT_ID_HERE"; // Replace with your Client ID
-const redirectUri = "http://localhost:3000/"; // Update for Vercel later
-
 // Game state
 let round = 1;
 let score = 0;
