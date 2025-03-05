@@ -73,36 +73,23 @@ input[type="range"] {
     transition: background 0.3s;
 }
 
-input[type="range"]::-webkit-slider-thumb {
+/* Seek slider */
+#seek-slider {
+    width: 150px;
+    background: linear-gradient(to right, #fff 0%, #fff calc(var(--value) * 1%), #535353 calc(var(--value) * 1%), #535353 100%);
+}
+
+#seek-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     width: 15px;
     height: 15px;
-    background: #1db954;
+    background: #fff;
     border-radius: 50%;
     cursor: pointer;
 }
 
-input[type="range"]:hover {
-    background: #828282;
-}
-
-/* Seek slider (Spotify style) */
-#seek-slider {
-    width: 150px;
-    background: linear-gradient(to right, #fff 0%, #fff var(--value), #535353 var(--value), #535353 100%);
-    --value: 0%;
-}
-
-#seek-slider::-webkit-slider-thumb {
-    background: #fff;
-}
-
 #seek-slider:hover {
-    background: linear-gradient(to right, #fff 0%, #fff var(--value), #828282 var(--value), #828282 100%);
-}
-
-#seek-slider,input {
-    --value: calc(100% * (attr(value) / attr(max)));
+    background: linear-gradient(to right, #fff 0%, #fff calc(var(--value) * 1%), #828282 calc(var(--value) * 1%), #828282 100%);
 }
 
 /* Volume slider */
@@ -120,12 +107,16 @@ input[type="range"]:hover {
 
 #volume-slider {
     width: 100px;
-    background: linear-gradient(to right, #fff 0%, #fff var(--value), #535353 var(--value), #535353 100%);
-    --value: 50%;
+    background: linear-gradient(to right, #fff 0%, #fff calc(var(--value) * 1%), #535353 calc(var(--value) * 1%), #535353 100%);
 }
 
 #volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
     background: #fff;
+    border-radius: 50%;
+    cursor: pointer;
 }
 
 /* Year slider */
@@ -135,7 +126,16 @@ input[type="range"]:hover {
 }
 
 #year-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
     background: #1db954;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+#year-slider:hover {
+    background: #828282;
 }
 
 #selected-year {
@@ -171,4 +171,22 @@ p {
 
 #rankings li {
     margin: 5px 0;
+}
+
+/* Dynamic slider value */
+#seek-slider, #volume-slider {
+    --value: 0;
+}
+
+#seek-slider {
+    --value: calc((var(--val) / var(--max)) * 100);
+}
+
+#volume-slider {
+    --value: calc((var(--val) / 100) * 100);
+}
+
+input[type="range"] {
+    --val: attr(value);
+    --max: attr(max);
 }
