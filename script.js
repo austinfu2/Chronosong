@@ -96,14 +96,22 @@ volumeSlider.addEventListener("input", () => {
 async function startRound() {
     let song;
     try {
+        nowPlaying.textContent = "Loading song...";
         song = await getRandomSong();
-        if (!song || !song.preview_url) throw new Error("No valid song found");
+        if (!song || !song.preview_url) {
+            throw new Error("No valid song found");
+        }
     } catch (error) {
         console.error("Error fetching song:", error);
-        nowPlaying.textContent = "Oops, couldn’t load a song. Trying again...";
-        setTimeout(startRound, 1000); // Retry
+        nowPlaying.textContent = "Failed to load a song. Please try again.";
+        guessBtn.disabled = true; // Disable guessing until resolved
+        setTimeout(() => {
+            guessBtn.disabled = false;
+            startRound(); // Retry once after delay
+        }, 2000);
         return;
     }
+
     currentSongYear = new Date(song.album.release_date).getFullYear();
     roundSpan.textContent = round;
     scoreSpan.textContent = score;
@@ -114,21 +122,43 @@ async function startRound() {
 }
 
 async function getRandomSong() {
-    const query = generateRandomString(2);
-    const response = await fetch(`https://api.spotify.com/v1/search?q=${query}&type=track&limit=50`, {
-        headers: { "Authorization": `Bearer ${token}` }
-    });
-    const data = await response.json();
-    const tracks = data.tracks.items.filter(track => track.popularity >= 30 && track.preview_url);
-    if (tracks.length === 0) return null; // No valid tracks
-    return tracks[Math.floor(Math.random() * tracks.length)];
+    const possibleQueries = ['a', 'b', 'pop', 'rock', 'jazz', '2020', 'love']; // Predefined queries
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    while (attempts < maxAttempts) {
+        const query = possibleQueries[Math.floor(Math.random() * possibleQueries.length)];
+        try {
+            const response = await fetch(`https://api.spotify.com/v1/search?q=${query}&type=track&limit=50`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (!response.ok) {
+                throw new Error(`Spotify API error: ${response.status}`);
+            }
+            const data = await response.json();
+            const tracks = data.tracks.items.filter(track => track.preview_url && track.popularity >= 30);
+            if (tracks.length > 0) {
+                return tracks[Math.floor(Math.random() * tracks.length)];
+            }
+            console.log(`No valid tracks for query "${query}", retrying...`);
+        } catch (error) {
+            console.error(`Attempt ${attempts + 1} failed:`, error);
+        }
+        attempts++;
+    }
+    throw new Error("No valid song found after max attempts");
 }
 
 function playSong(url) {
     audio.src = url;
     audio.volume = volumeSlider.value / 100;
-    audio.play().catch(err => console.error("Play failed:", err));
+    audio.play().catch(err => {
+        console.error("Playback failed:", err);
+        nowPlaying.textContent = "Error playing song. Skipping...";
+        setTimeout(startRound, 1000);
+    });
     playPauseBtn.textContent = "Pause";
+    seekSlider.max = 30; // Hardcode to 30s for previews
 }
 
 slider.addEventListener("input", () => {
