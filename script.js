@@ -89,11 +89,21 @@ seekSlider.addEventListener("input", () => {
 
 volumeSlider.addEventListener("input", () => {
     audio.volume = volumeSlider.value / 100;
+    volumeSlider.style.setProperty('--value', volumeSlider.value); // Update fill
 });
 
 // Game logic
 async function startRound() {
-    const song = await getRandomSong();
+    let song;
+    try {
+        song = await getRandomSong();
+        if (!song || !song.preview_url) throw new Error("No valid song found");
+    } catch (error) {
+        console.error("Error fetching song:", error);
+        nowPlaying.textContent = "Oops, couldn’t load a song. Trying again...";
+        setTimeout(startRound, 1000); // Retry
+        return;
+    }
     currentSongYear = new Date(song.album.release_date).getFullYear();
     roundSpan.textContent = round;
     scoreSpan.textContent = score;
@@ -110,13 +120,14 @@ async function getRandomSong() {
     });
     const data = await response.json();
     const tracks = data.tracks.items.filter(track => track.popularity >= 30 && track.preview_url);
+    if (tracks.length === 0) return null; // No valid tracks
     return tracks[Math.floor(Math.random() * tracks.length)];
 }
 
 function playSong(url) {
     audio.src = url;
     audio.volume = volumeSlider.value / 100;
-    audio.play();
+    audio.play().catch(err => console.error("Play failed:", err));
     playPauseBtn.textContent = "Pause";
 }
 
@@ -128,7 +139,7 @@ guessBtn.addEventListener("click", () => {
     audio.pause();
     const guess = parseInt(slider.value);
     const diff = Math.abs(guess - currentSongYear);
-    let roundScore = diff >= 10 ? 0 : Math.round(100 * Math.pow(0.5, diff / 2)); // Logarithmic drop-off
+    let roundScore = diff >= 10 ? 0 : Math.round(100 * Math.pow(0.5, diff / 2));
 
     score += roundScore;
     result.textContent = `Song year: ${currentSongYear}. You scored: ${roundScore}`;
