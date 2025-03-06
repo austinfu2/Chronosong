@@ -1,7 +1,7 @@
 // Spotify credentials
-const clientId = "41145da745e74ef8bb6e57a16a98997e";
-const redirectUri = "https://chronosong.vercel.app/";
-const scopes = "streaming user-read-email user-read-private user-modify-playback-state";
+const clientId = "41145da745e74ef8bb6e57a16a98997e"; // Replace with your actual Client ID
+const redirectUri = "https://chronosong.vercel.app/"; // Must match Spotify Dashboard
+const scopes = "user-read-email user-read-private user-modify-playback-state"; // Removed 'streaming'
 
 // Game state
 let round = 1;
@@ -54,8 +54,13 @@ function getTokenFromUrl() {
     if (hash.access_token) {
         token = hash.access_token;
         console.log("Token set:", token);
-        window.location.hash = "";
-        setupPlayer();
+        window.location.hash = ""; // Clear hash
+        // Wait for SDK to be ready before setting up player
+        if (window.Spotify) {
+            setupPlayer();
+        } else {
+            console.log("Waiting for Spotify SDK to load...");
+        }
     } else {
         console.error("Auth failed:", hash);
     }
@@ -64,10 +69,14 @@ function getTokenFromUrl() {
 // Spotify player setup
 window.onSpotifyWebPlaybackSDKReady = () => {
     console.log("Spotify SDK loaded");
-    if (token) setupPlayer(); // Ensure token is set before setup
+    if (token) setupPlayer(); // Setup player if token is already available
 };
 
 function setupPlayer() {
+    if (!window.Spotify) {
+        console.error("Spotify SDK not loaded yet");
+        return;
+    }
     player = new window.Spotify.Player({
         name: "ChronoSong Player",
         getOAuthToken: cb => cb(token),
@@ -86,7 +95,7 @@ function setupPlayer() {
             isPlaying = !state.paused;
             playPauseBtn.textContent = isPlaying ? "Pause" : "Play";
             seekSlider.value = state.position / 1000;
-            seekSlider.max = state.duration / 1000; // Full track duration
+            seekSlider.max = state.duration / 1000;
         }
     });
 
@@ -103,7 +112,7 @@ function activateDevice(deviceId) {
             "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ device_ids: [device_id], play: false })
+        body: JSON.stringify({ device_ids: [deviceId], play: false })
     })
     .then(response => {
         if (!response.ok) throw new Error(`Activate failed: ${response.status}`);
@@ -113,7 +122,10 @@ function activateDevice(deviceId) {
         gameContainer.style.display = "block";
         startRound();
     })
-    .catch(err => console.error("Activate error:", err));
+    .catch(err => {
+        console.error("Activate error:", err);
+        nowPlaying.textContent = "Failed to activate device. Please refresh.";
+    });
 }
 
 // Player controls
@@ -154,7 +166,7 @@ async function startRound() {
 }
 
 async function getRandomSong() {
-    const queries = ["pop", "rock", "jazz", "hits", "2020s"]; // Broader queries
+    const queries = ["pop", "rock", "jazz", "hits", "2020s"];
     let attempts = 0;
     const maxAttempts = 5;
 
@@ -188,7 +200,7 @@ function playSong(uri) {
             "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ uris: [uri] })
+        body: JSON.stringify({ uris: [uri], position_ms: 0 })
     })
     .then(response => {
         if (!response.ok) throw new Error(`Play failed: ${response.status}`);
