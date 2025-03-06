@@ -1,7 +1,7 @@
 // Spotify credentials
 const clientId = "41145da745e74ef8bb6e57a16a98997e";
 const redirectUri = "https://chronosong.vercel.app/";
-const scopes = "user-read-email user-read-private user-modify-playback-state streaming";
+const scopes = "user-read-email user-read-private user-modify-playback-state";
 
 // Game state
 let round = 1;
@@ -42,7 +42,7 @@ function generateRandomString(length) {
 function login() {
     const state = generateRandomString(16);
     const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&state=${state}`;
-    window.location.href = authUrl; // Use .href to ensure full navigation
+    window.location.href = authUrl;
 }
 
 function getTokenFromUrl() {
@@ -55,7 +55,7 @@ function getTokenFromUrl() {
     if (hash.access_token) {
         token = hash.access_token;
         console.log("Token set:", token);
-        window.location.hash = ""; // Clear hash to prevent reprocessing
+        window.location.hash = "";
         if (sdkReady) {
             setupPlayer();
         } else {
@@ -121,7 +121,9 @@ function activateDevice(deviceId) {
     })
     .then(response => {
         if (!response.ok) {
-            return response.json().then(err => { throw new Error(`Activate failed: ${response.status} - ${err.error.message}`); });
+            return response.json().then(err => {
+                throw new Error(`Activate failed: ${response.status} - ${err.error.message} (${err.error.reason})`);
+            });
         }
         console.log("Device activated");
         loginBtn.style.display = "none";
@@ -131,7 +133,7 @@ function activateDevice(deviceId) {
     })
     .catch(err => {
         console.error("Activate error:", err);
-        nowPlaying.textContent = "Failed to activate device. Please refresh and ensure Spotify is set up correctly.";
+        nowPlaying.textContent = `Failed to activate device: ${err.message}. Ensure you have Spotify Premium and try again.`;
     });
 }
 
