@@ -1,7 +1,7 @@
 // Spotify credentials
 const clientId = "41145da745e74ef8bb6e57a16a98997e";
 const redirectUri = "https://chronosong.vercel.app/";
-const scopes = "user-read-email user-read-private user-modify-playback-state";
+const scopes = "user-read-email user-read-private user-modify-playback-state streaming";
 
 // Game state
 let round = 1;
@@ -13,6 +13,7 @@ let token;
 let player;
 let deviceId;
 let isPlaying = false;
+let sdkReady = false;
 
 // DOM elements
 const loginBtn = document.getElementById("login-btn");
@@ -41,7 +42,7 @@ function generateRandomString(length) {
 function login() {
     const state = generateRandomString(16);
     const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&state=${state}`;
-    window.location = authUrl;
+    window.location.href = authUrl; // Use .href to ensure full navigation
 }
 
 function getTokenFromUrl() {
@@ -54,26 +55,30 @@ function getTokenFromUrl() {
     if (hash.access_token) {
         token = hash.access_token;
         console.log("Token set:", token);
-        window.location.hash = ""; // Clear hash
-        // Wait for SDK to be ready before setting up player
-        if (window.Spotify) {
+        window.location.hash = ""; // Clear hash to prevent reprocessing
+        if (sdkReady) {
             setupPlayer();
         } else {
             console.log("Waiting for Spotify SDK to load...");
         }
     } else {
-        console.error("Auth failed:", hash);
+        console.error("No access token found in URL");
     }
 }
 
 // Spotify player setup
 window.onSpotifyWebPlaybackSDKReady = () => {
     console.log("Spotify SDK loaded");
-    if (token) setupPlayer(); // Setup player if token is already available
+    sdkReady = true;
+    if (token) {
+        setupPlayer();
+    } else {
+        console.log("SDK ready, waiting for token...");
+    }
 };
 
 function setupPlayer() {
-    if (!window.Spotify) {
+    if (!sdkReady || !window.Spotify) {
         console.error("Spotify SDK not loaded yet");
         return;
     }
@@ -115,7 +120,9 @@ function activateDevice(deviceId) {
         body: JSON.stringify({ device_ids: [deviceId], play: false })
     })
     .then(response => {
-        if (!response.ok) throw new Error(`Activate failed: ${response.status}`);
+        if (!response.ok) {
+            return response.json().then(err => { throw new Error(`Activate failed: ${response.status} - ${err.error.message}`); });
+        }
         console.log("Device activated");
         loginBtn.style.display = "none";
         spotifyPlayer.style.display = "block";
@@ -124,17 +131,14 @@ function activateDevice(deviceId) {
     })
     .catch(err => {
         console.error("Activate error:", err);
-        nowPlaying.textContent = "Failed to activate device. Please refresh.";
+        nowPlaying.textContent = "Failed to activate device. Please refresh and ensure Spotify is set up correctly.";
     });
 }
 
 // Player controls
 playPauseBtn.addEventListener("click", () => {
-    if (isPlaying) {
-        player.pause();
-    } else {
-        player.resume();
-    }
+    if (isPlaying) player.pause();
+    else player.resume();
 });
 
 seekSlider.addEventListener("input", () => {
