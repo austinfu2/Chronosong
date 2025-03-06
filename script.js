@@ -94,27 +94,35 @@ function setupPlayer() {
     player = new window.Spotify.Player({
         name: "ChronoSong Player",
         getOAuthToken: cb => cb(token),
-        volume: volumeSlider.value / 100
+        volume: 0.5
     });
 
     player.addListener("ready", ({ device_id }) => {
         if (device_id) {
             deviceId = device_id;
             console.log("✅ Player ready with Device ID:", device_id);
-            activateDevice(device_id);
         } else {
-            console.error("❌ Failed to retrieve device ID. Retrying...");
-            setTimeout(setupPlayer, 2000); // Retry in 2 seconds
+            console.error("❌ Failed to retrieve device ID. Retrying in 2 seconds...");
+            setTimeout(setupPlayer, 2000);
         }
     });
 
     player.addListener("not_ready", ({ device_id }) => {
-        console.log("Device offline:", device_id);
+        console.log("🔴 Device went offline:", device_id);
     });
 
     player.connect().then(success => {
-        if (success) console.log("✅ Player connected successfully.");
-        else console.error("❌ Player connection failed.");
+        if (success) {
+            console.log("✅ Player connected successfully.");
+            
+            // **Force reconnect if we don’t get a device ID**
+            setTimeout(() => {
+                player.disconnect();
+                setTimeout(() => player.connect(), 2000);
+            }, 5000);
+        } else {
+            console.error("❌ Player connection failed.");
+        }
     }).catch(err => console.error("❌ Player connect error:", err));
 }
 
