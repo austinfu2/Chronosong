@@ -1,7 +1,7 @@
 // Spotify credentials
 const clientId = "41145da745e74ef8bb6e57a16a98997e";
 const redirectUri = "https://chronosong.vercel.app/";
-const scopes = "user-read-email user-read-private user-modify-playback-state streaming";
+const scopes = "user-read-email user-read-private user-modify-playback-state user-read-playback-state streaming app-remote-control";
 
 // Game state
 let round = 1;
@@ -113,7 +113,7 @@ function setupPlayer() {
 }
 
 function activateDevice(deviceId) {
-    console.log("Device ID:", deviceId);
+    console.log("Activating device with ID:", deviceId);
     fetch("https://api.spotify.com/v1/me/player", {
         method: "PUT",
         headers: {
@@ -125,15 +125,16 @@ function activateDevice(deviceId) {
     .then(response => {
         if (!response.ok) {
             return response.json().then(err => {
-                console.error("Activate failed:", err);
+                console.error("Activation failed:", err);
+                throw new Error(`Activation failed: ${response.status} - ${err.error.message}`);
             });
         }
-        console.log("Device activated");
-        startRound(); // Start the game only when the device is activated
+        console.log("Device activated successfully!");
+        startRound();
     })
     .catch(err => {
-        console.error("Activate error:", err);
-        nowPlaying.textContent = "Failed to activate device. Check Premium status.";
+        console.error("Activation error:", err);
+        nowPlaying.textContent = "Failed to activate device. Try playing a song in Spotify first.";
     });
 }
 
@@ -272,6 +273,8 @@ loginBtn.addEventListener("click", login);
 if (window.location.hash) {
     console.log("Checking URL for token...");
     getTokenFromUrl();
+    console.log("OAuth Token:", token);
+    console.log("Device ID:", deviceId);
 } else {
     console.log("Please log in to start");
 }
