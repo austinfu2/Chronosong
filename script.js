@@ -1,7 +1,7 @@
 // Spotify credentials
 const clientId = "41145da745e74ef8bb6e57a16a98997e";
 const redirectUri = "https://chronosong.vercel.app/";
-const scopes = "user-read-email user-read-private user-modify-playback-state";
+const scopes = "user-read-email user-read-private user-modify-playback-state streaming";
 
 // Game state
 let round = 1;
@@ -113,6 +113,7 @@ function setupPlayer() {
 }
 
 function activateDevice(deviceId) {
+    console.log("Device ID:", deviceId);
     fetch("https://api.spotify.com/v1/me/player", {
         method: "PUT",
         headers: {
@@ -124,24 +125,15 @@ function activateDevice(deviceId) {
     .then(response => {
         if (!response.ok) {
             return response.json().then(err => {
-                throw new Error(`Activate failed: ${response.status} - ${err.error.message} (${err.error.reason})`);
+                console.error("Activate failed:", err);
             });
         }
         console.log("Device activated");
-        loginBtn.style.display = "none";
-        spotifyPlayer.style.display = "block";
-        gameContainer.style.display = "block";
-        startRound();
+        startRound(); // Start the game only when the device is activated
     })
     .catch(err => {
         console.error("Activate error:", err);
-        nowPlaying.textContent = `Failed to start: ${err.message}.`;
-        // Fallback: Try starting without explicit activation
-        console.log("Attempting fallback start...");
-        loginBtn.style.display = "none";
-        spotifyPlayer.style.display = "block";
-        gameContainer.style.display = "block";
-        startRound();
+        nowPlaying.textContent = "Failed to activate device. Check Premium status.";
     });
 }
 
