@@ -1,5 +1,5 @@
 // Spotify credentials
-const clientId = "41145da745e74ef8bb6e57a16a98997e";
+const clientId = "5a87105f7b274adf948fadd25343292d";
 const redirectUri = "https://chronosong.vercel.app/";
 const scopes = "user-read-email user-read-private user-modify-playback-state user-read-playback-state streaming app-remote-control";
 
@@ -287,8 +287,6 @@ loginBtn.addEventListener("click", login);
 if (window.location.hash) {
     console.log("Checking URL for token...");
     getTokenFromUrl();
-    console.log("OAuth Token:", token);
-    console.log("Device ID:", deviceId);
 } else {
     console.log("Please log in to start");
 }
