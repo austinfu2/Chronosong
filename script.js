@@ -41,7 +41,7 @@ function generateRandomString(length) {
 
 function login() {
     const state = generateRandomString(16);
-    const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&state=${state}`;
+    const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&state=${state}&show_dialog=true`; // Force fresh login
     window.location.href = authUrl;
 }
 
@@ -135,7 +135,13 @@ function activateDevice(deviceId) {
     })
     .catch(err => {
         console.error("Activate error:", err);
-        nowPlaying.textContent = `Failed to start: ${err.message}. Check Premium status or try again later.`;
+        nowPlaying.textContent = `Failed to start: ${err.message}.`;
+        // Fallback: Try starting without explicit activation
+        console.log("Attempting fallback start...");
+        loginBtn.style.display = "none";
+        spotifyPlayer.style.display = "block";
+        gameContainer.style.display = "block";
+        startRound();
     });
 }
 
@@ -211,14 +217,18 @@ function playSong(uri) {
         body: JSON.stringify({ uris: [uri], position_ms: 0 })
     })
     .then(response => {
-        if (!response.ok) throw new Error(`Play failed: ${response.status}`);
+        if (!response.ok) {
+            return response.json().then(err => {
+                throw new Error(`Play failed: ${response.status} - ${err.error.message} (${err.error.reason})`);
+            });
+        }
         console.log(`Playing ${uri}`);
         isPlaying = true;
         playPauseBtn.textContent = "Pause";
     })
     .catch(err => {
         console.error("Play error:", err);
-        nowPlaying.textContent = "Error playing song. Skipping...";
+        nowPlaying.textContent = `Play error: ${err.message}. Skipping...`;
         setTimeout(startRound, 1000);
     });
 }
