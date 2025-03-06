@@ -54,10 +54,10 @@ function getTokenFromUrl() {
 
     if (hash.access_token) {
         token = hash.access_token;
+        localStorage.setItem("spotify_token", token); // ✅ Save token in localStorage
         console.log("🔑 Token set:", token);
-        window.location.hash = "";
+        window.location.hash = ""; // ✅ Remove token from URL to prevent infinite reloads
 
-        // Wait for SDK to be ready
         if (sdkReady) {
             setupPlayer();
         } else {
@@ -134,23 +134,35 @@ function activateDevice(deviceId) {
 
     console.log("🎵 Attempting to activate device:", deviceId);
 
-    fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+    fetch("https://api.spotify.com/v1/me/player", {
         method: "PUT",
         headers: {
             "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-            uris: ["spotify:track:4uLU6hMCjMI75M1A2tKUQC"] // Example song
-        })
+        body: JSON.stringify({ device_ids: [deviceId], play: false })
     })
     .then(response => {
-        if (!response.ok) throw new Error(`Activation failed: ${response.status}`);
-        console.log("✅ Device activated and playback started!");
-        startRound();
+        if (!response.ok) {
+            return response.json().then(err => {
+                console.error("❌ Activation failed:", err);
+                throw new Error(`Activation failed: ${response.status} - ${err.error.message}`);
+            });
+        }
+        console.log("✅ Device activated successfully!");
+
+        // ✅ Ensure game starts
+        setTimeout(() => {
+            console.log("🎮 Starting Round 1...");
+            startRound();
+        }, 1000);
     })
-    .catch(err => console.error("❌ Activation error:", err));
+    .catch(err => {
+        console.error("❌ Activation error:", err);
+        nowPlaying.textContent = "Failed to activate device. Try playing a song in Spotify first.";
+    });
 }
+
 
 // Player controls
 playPauseBtn.addEventListener("click", () => {
@@ -284,9 +296,16 @@ playAgainBtn.addEventListener("click", () => {
 
 // Init
 loginBtn.addEventListener("click", login);
-if (window.location.hash) {
+
+const storedToken = localStorage.getItem("spotify_token");
+if (storedToken) {
+    token = storedToken;
+    console.log("✅ Using stored token:", token);
+    setupPlayer();
+} else if (window.location.hash) {
     console.log("Checking URL for token...");
     getTokenFromUrl();
 } else {
-    console.log("Please log in to start");
+    console.log("🔑 No token found, prompting login...");
 }
+
