@@ -63,6 +63,7 @@ function getTokenFromUrl() {
         }
     } else {
         console.error("No access token found in URL");
+        nowPlaying.textContent = "Login failed: No token received.";
     }
 }
 
@@ -80,6 +81,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
 function setupPlayer() {
     if (!sdkReady || !window.Spotify) {
         console.error("Spotify SDK not loaded yet");
+        nowPlaying.textContent = "Error: Spotify SDK failed to load.";
         return;
     }
     player = new window.Spotify.Player({
@@ -133,7 +135,7 @@ function activateDevice(deviceId) {
     })
     .catch(err => {
         console.error("Activate error:", err);
-        nowPlaying.textContent = `Failed to activate device: ${err.message}. Ensure you have Spotify Premium and try again.`;
+        nowPlaying.textContent = `Failed to start: ${err.message}. Check Premium status or try again later.`;
     });
 }
 
