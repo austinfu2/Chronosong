@@ -54,13 +54,14 @@ function getTokenFromUrl() {
 
     if (hash.access_token) {
         token = hash.access_token;
-        console.log("Token set:", token);
+        console.log("🔑 Token set:", token);
         window.location.hash = "";
 
+        // Wait for SDK to be ready
         if (sdkReady) {
             setupPlayer();
         } else {
-            console.log("Token received, but SDK not ready. Waiting...");
+            console.log("🕒 Token received, but SDK not ready. Waiting...");
             const checkSDK = setInterval(() => {
                 if (sdkReady) {
                     setupPlayer();
@@ -69,7 +70,7 @@ function getTokenFromUrl() {
             }, 500);
         }
     } else {
-        console.error("No access token found in URL");
+        console.error("❌ No access token found in URL");
     }
 }
 
@@ -89,6 +90,7 @@ function setupPlayer() {
         console.error("Spotify SDK not loaded yet");
         return;
     }
+
     player = new window.Spotify.Player({
         name: "ChronoSong Player",
         getOAuthToken: cb => cb(token),
@@ -96,13 +98,13 @@ function setupPlayer() {
     });
 
     player.addListener("ready", ({ device_id }) => {
-        console.log("Player ready with Device ID:", device_id);
         if (device_id) {
             deviceId = device_id;
+            console.log("✅ Player ready with Device ID:", device_id);
             activateDevice(device_id);
         } else {
-            console.error("Failed to retrieve device ID. Retrying in 2 seconds...");
-            setTimeout(setupPlayer, 2000);
+            console.error("❌ Failed to retrieve device ID. Retrying...");
+            setTimeout(setupPlayer, 2000); // Retry in 2 seconds
         }
     });
 
@@ -111,15 +113,20 @@ function setupPlayer() {
     });
 
     player.connect().then(success => {
-        if (success) console.log("Player connected successfully.");
-        else console.error("Player connection failed.");
-    }).catch(err => console.error("Player connect error:", err));
+        if (success) console.log("✅ Player connected successfully.");
+        else console.error("❌ Player connection failed.");
+    }).catch(err => console.error("❌ Player connect error:", err));
 }
 
 function activateDevice(deviceId) {
-    console.log("Activating device:", deviceId);
+    if (!deviceId) {
+        console.error("❌ Device ID is undefined. Cannot activate device.");
+        return;
+    }
 
-    fetch("https://api.spotify.com/v1/me/player/play?device_id=" + deviceId, {
+    console.log("🎵 Attempting to activate device:", deviceId);
+
+    fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
         method: "PUT",
         headers: {
             "Authorization": `Bearer ${token}`,
@@ -131,10 +138,10 @@ function activateDevice(deviceId) {
     })
     .then(response => {
         if (!response.ok) throw new Error(`Activation failed: ${response.status}`);
-        console.log("Device activated!");
+        console.log("✅ Device activated and playback started!");
         startRound();
     })
-    .catch(err => console.error("Activation error:", err));
+    .catch(err => console.error("❌ Activation error:", err));
 }
 
 // Player controls
