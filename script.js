@@ -51,19 +51,25 @@ function getTokenFromUrl() {
         acc[key] = value;
         return acc;
     }, {});
-    console.log("Hash:", hash);
+
     if (hash.access_token) {
         token = hash.access_token;
         console.log("Token set:", token);
         window.location.hash = "";
+
         if (sdkReady) {
             setupPlayer();
         } else {
-            console.log("Waiting for Spotify SDK to load...");
+            console.log("Token received, but SDK not ready. Waiting...");
+            const checkSDK = setInterval(() => {
+                if (sdkReady) {
+                    setupPlayer();
+                    clearInterval(checkSDK);
+                }
+            }, 500);
         }
     } else {
         console.error("No access token found in URL");
-        nowPlaying.textContent = "Login failed: No token received.";
     }
 }
 
@@ -81,7 +87,6 @@ window.onSpotifyWebPlaybackSDKReady = () => {
 function setupPlayer() {
     if (!sdkReady || !window.Spotify) {
         console.error("Spotify SDK not loaded yet");
-        nowPlaying.textContent = "Error: Spotify SDK failed to load.";
         return;
     }
     player = new window.Spotify.Player({
@@ -91,51 +96,45 @@ function setupPlayer() {
     });
 
     player.addListener("ready", ({ device_id }) => {
-        deviceId = device_id;
         console.log("Player ready with Device ID:", device_id);
-        activateDevice(device_id);
-    });
-
-    player.addListener("not_ready", ({ device_id }) => console.log("Device offline:", device_id));
-    player.addListener("player_state_changed", state => {
-        if (state) {
-            isPlaying = !state.paused;
-            playPauseBtn.textContent = isPlaying ? "Pause" : "Play";
-            seekSlider.value = state.position / 1000;
-            seekSlider.max = state.duration / 1000;
+        if (device_id) {
+            deviceId = device_id;
+            activateDevice(device_id);
+        } else {
+            console.error("Failed to retrieve device ID. Retrying in 2 seconds...");
+            setTimeout(setupPlayer, 2000);
         }
     });
 
+    player.addListener("not_ready", ({ device_id }) => {
+        console.log("Device offline:", device_id);
+    });
+
     player.connect().then(success => {
-        if (success) console.log("Player connected");
-        else console.error("Player connection failed");
-    }).catch(err => console.error("Connect error:", err));
+        if (success) console.log("Player connected successfully.");
+        else console.error("Player connection failed.");
+    }).catch(err => console.error("Player connect error:", err));
 }
 
 function activateDevice(deviceId) {
-    console.log("Activating device with ID:", deviceId);
-    fetch("https://api.spotify.com/v1/me/player", {
+    console.log("Activating device:", deviceId);
+
+    fetch("https://api.spotify.com/v1/me/player/play?device_id=" + deviceId, {
         method: "PUT",
         headers: {
             "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ device_ids: [deviceId], play: false })
+        body: JSON.stringify({
+            uris: ["spotify:track:4uLU6hMCjMI75M1A2tKUQC"] // Example song
+        })
     })
     .then(response => {
-        if (!response.ok) {
-            return response.json().then(err => {
-                console.error("Activation failed:", err);
-                throw new Error(`Activation failed: ${response.status} - ${err.error.message}`);
-            });
-        }
-        console.log("Device activated successfully!");
+        if (!response.ok) throw new Error(`Activation failed: ${response.status}`);
+        console.log("Device activated!");
         startRound();
     })
-    .catch(err => {
-        console.error("Activation error:", err);
-        nowPlaying.textContent = "Failed to activate device. Try playing a song in Spotify first.";
-    });
+    .catch(err => console.error("Activation error:", err));
 }
 
 // Player controls
